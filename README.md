@@ -9,8 +9,11 @@ Then it shazam each segment to write the song name in res.txt.
 On Linux
 
 ```sh
-pip install ShazamApi
 sudo apt install ffmpeg 
+
+pip install ShazamApi
+pip install pydub
+
 python shazam.py <audio_file>
 ```
 
