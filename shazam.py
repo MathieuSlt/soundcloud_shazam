@@ -1,6 +1,7 @@
 from ShazamAPI import Shazam
 from pydub import AudioSegment
 import os
+import sys
 
 
 def remove_file(dir):
@@ -48,12 +49,20 @@ def get_song_name(audio_file):
 
 if __name__ == "__main__":
 
+    if len(sys.argv) < 2:
+        print("Please provide an audio file")
+        print("Usage: python shazam.py <audio_file>")
+        exit()
+
     print("Starting...")
 
     print("Removing files...")
     remove_file("export")
 
-    audio_file = "Nightmare Prelude.mp3"
+    # get the audio file from the user input
+    audio_file = sys.argv[1]
+
+    # audio_file = "Nightmare Prelude.mp3"
 
     with open('res.txt', "w") as f:
         f.write(f"Initial File: {audio_file}\n\n")
