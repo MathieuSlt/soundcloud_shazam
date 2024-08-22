@@ -6,6 +6,9 @@ import asyncio
 from shazamio import Shazam
 from pytube import YouTube
 
+# Define the length of each segment in milliseconds
+SEGMENT_LENGHT = 60 * 1000
+
 
 def remove_files(dir):
     files = os.listdir(dir)
@@ -18,18 +21,44 @@ def write_to_file(data):
         f.write(data.encode('utf-8').decode('utf-8'))
 
 
+# function to open song_names.txt and clean ducplicates
+def clean_song_names():
+    with open('song_names.txt', "r", encoding="utf-8") as f:
+        # Skip the first 2 lines
+        next(f)
+        next(f)
+        # Read the rest of the file
+        lines = f.readlines()
+
+    # Create a set to track unique song names and a list to store unique, ordered lines
+    seen = set()
+    unique_lines = []
+
+    for line in lines:
+        # Extract the song name part after the first " - "
+        song_name = line.split(' - ', 1)[1]
+        if song_name not in seen:
+            unique_lines.append(line)
+            seen.add(song_name)
+
+    # Sort the lines based on the leading number
+    unique_lines.sort(key=lambda x: int(x.split(' - ')[0]))
+
+    with open('song_names_clean.txt', "w", encoding="utf-8") as f:
+        f.writelines(unique_lines)
+
+
 def segment_audio(audio_file):
     # Load the audio file (mp3 format)
     audio = AudioSegment.from_file(audio_file, format="mp3")
-    # Define the length of each segment in milliseconds
-    segment_length = 90 * 1000
+
     # Split the audio into segments of length segment_length
-    segments = [audio[i:i+segment_length]
-                for i in range(0, len(audio), segment_length)]
+    segments = [audio[i:i+SEGMENT_LENGHT]
+                for i in range(0, len(audio), SEGMENT_LENGHT)]
     # Save each segment as a separate file
     for i, segment in enumerate(segments):
         segment.export(
-            f"export/{audio_file[:-4]}_segment{i+1}.mp3", format="mp3")
+            f"export/{i+1}.mp3", format="mp3")
 
 
 def get_song_name(audio_file):
@@ -102,9 +131,11 @@ if __name__ == "__main__":
     for file in files:
         loop = asyncio.get_event_loop()
         name = loop.run_until_complete(get_name(f"export/{file}"))
-        write_to_file(data=f"{name}\n")
+        # write_to_file(data=f"{name}\n")
+        write_to_file(data=f"{file.replace('.mp3', '')} - {name}\n")
 
     print("Cleaning up...")
+    clean_song_names()
     remove_files("export")
 
     print("Done!")
