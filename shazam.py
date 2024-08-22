@@ -2,6 +2,9 @@ from ShazamAPI import Shazam
 from pydub import AudioSegment
 import os
 import sys
+import asyncio
+from shazamio import Shazam
+from pytube import YouTube
 
 
 def remove_files(dir):
@@ -11,16 +14,15 @@ def remove_files(dir):
 
 
 def write_to_file(data):
-    with open('song_names.txt', "a") as f:
-        f.write(data)
+    with open('song_names.txt', "a", encoding="utf-8") as f:
+        f.write(data.encode('utf-8').decode('utf-8'))
 
 
-# Split the audio file into segments
 def segment_audio(audio_file):
     # Load the audio file (mp3 format)
     audio = AudioSegment.from_file(audio_file, format="mp3")
     # Define the length of each segment in milliseconds
-    segment_length = 180 * 1000
+    segment_length = 90 * 1000
     # Split the audio into segments of length segment_length
     segments = [audio[i:i+segment_length]
                 for i in range(0, len(audio), segment_length)]
@@ -35,7 +37,7 @@ def get_song_name(audio_file):
     shazam = Shazam(mp3_file_content_to_recognize)
     recognize_generator = shazam.recognizeSong()
 
-    for i in range(10):
+    for i in range(20):
         sound_data_tuple = next(recognize_generator)
         if 'track' in sound_data_tuple[1]:
             sound_data_dict = sound_data_tuple[1]
@@ -46,6 +48,33 @@ def get_song_name(audio_file):
     return "Not found"
 
 
+def download_youtube(url, output_path='Downloads'):
+    yt = YouTube(url)
+    video = yt.streams.filter(only_audio=True).first()
+
+    # download the file
+    out_file = video.download(output_path=output_path)
+
+    # save the file
+    base, ext = os.path.splitext(out_file)
+    new_file = base + '.mp3'
+    os.rename(out_file, new_file)
+
+    # result of success
+    print(yt.title + " has been successfully downloaded.")
+
+
+async def get_name(file):
+    shazam = Shazam()
+    data = await shazam.recognize(file)
+    if 'track' not in data:
+        return "Not found"
+
+    title = data['track']['title']
+    subtitle = data['track']['subtitle']
+    print(f"{title} - {subtitle}")
+    return f"{title} - {subtitle}"
+
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
@@ -53,6 +82,7 @@ if __name__ == "__main__":
         print("Usage: python shazam.py <audio_file>")
         exit()
 
+    # download_youtube(sys.argv[1])
     print("Starting...")
 
     print("Removing files...")
@@ -61,7 +91,7 @@ if __name__ == "__main__":
     # get the audio file from the user input
     audio_file = sys.argv[1]
 
-    with open('song_names.txt', "w") as f:
+    with open('song_names.txt', "w", encoding="utf-8") as f:
         f.write(f"Initial File: {audio_file}\n\n")
 
     print("Segmenting audio file...")
@@ -70,8 +100,8 @@ if __name__ == "__main__":
     print("Getting song names...")
     files = os.listdir("export")
     for file in files:
-        write_to_file(data=f"{file}: ")
-        name = get_song_name(f"export/{file}")
+        loop = asyncio.get_event_loop()
+        name = loop.run_until_complete(get_name(f"export/{file}"))
         write_to_file(data=f"{name}\n")
 
     print("Cleaning up...")
