@@ -5,9 +5,11 @@ import sys
 import asyncio
 from shazamio import Shazam
 from pytube import YouTube
+from concurrent.futures import ThreadPoolExecutor
 
 # Define the length of each segment in milliseconds
-SEGMENT_LENGHT = 60 * 1000
+SEGMENT_LENGTH = 60 * 1000  # 60 seconds
+output_file = 'song_names.txt'
 
 
 def remove_files(dir):
@@ -17,13 +19,13 @@ def remove_files(dir):
 
 
 def write_to_file(data):
-    with open('song_names.txt', "a", encoding="utf-8") as f:
+    with open(output_file, "a", encoding="utf-8") as f:
         f.write(data.encode('utf-8').decode('utf-8'))
 
 
 # function to open song_names.txt and clean ducplicates
 def clean_song_names():
-    with open('song_names.txt', "r", encoding="utf-8") as f:
+    with open(output_file, "r", encoding="utf-8") as f:
         # Skip the first 2 lines
         next(f)
         next(f)
@@ -48,17 +50,39 @@ def clean_song_names():
         f.writelines(unique_lines)
 
 
-def segment_audio(audio_file):
+# def segment_audio(audio_file):
+#     # Load the audio file (mp3 format)
+#     audio = AudioSegment.from_file(audio_file, format="mp3")
+
+#     # Split the audio into segments of length segment_length
+#     segments = [audio[i:i+SEGMENT_LENGHT]
+#                 for i in range(0, len(audio), SEGMENT_LENGHT)]
+#     # Save each segment as a separate file
+#     for i, segment in enumerate(segments):
+#         segment.export(
+#             f"export/{i+1}.mp3", format="mp3")
+
+
+def export_segment(segment, index):
+    # Export each segment to a file
+    segment.export(f"export/{index + 1}.mp3", format="mp3")
+
+
+def segment_audio(audio_file, num_threads=4):
+
     # Load the audio file (mp3 format)
     audio = AudioSegment.from_file(audio_file, format="mp3")
 
-    # Split the audio into segments of length segment_length
-    segments = [audio[i:i+SEGMENT_LENGHT]
-                for i in range(0, len(audio), SEGMENT_LENGHT)]
-    # Save each segment as a separate file
-    for i, segment in enumerate(segments):
-        segment.export(
-            f"export/{i+1}.mp3", format="mp3")
+    # Split the audio into segments of length SEGMENT_LENGTH
+    segments = [audio[i:i + SEGMENT_LENGTH]
+                for i in range(0, len(audio), SEGMENT_LENGTH)]
+
+    # Ensure export directory exists
+    os.makedirs("export", exist_ok=True)
+
+    # Use ThreadPoolExecutor to export segments in parallel
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        executor.map(export_segment, segments, range(len(segments)))
 
 
 def get_song_name(audio_file):
@@ -66,7 +90,7 @@ def get_song_name(audio_file):
     shazam = Shazam(mp3_file_content_to_recognize)
     recognize_generator = shazam.recognizeSong()
 
-    for i in range(20):
+    for _ in range(20):
         sound_data_tuple = next(recognize_generator)
         if 'track' in sound_data_tuple[1]:
             sound_data_dict = sound_data_tuple[1]
@@ -85,7 +109,7 @@ def download_youtube(url, output_path='Downloads'):
     out_file = video.download(output_path=output_path)
 
     # save the file
-    base, ext = os.path.splitext(out_file)
+    base, _ = os.path.splitext(out_file)
     new_file = base + '.mp3'
     os.rename(out_file, new_file)
 
@@ -103,6 +127,7 @@ async def get_name(file):
     subtitle = data['track']['subtitle']
     print(f"{title} - {subtitle}")
     return f"{title} - {subtitle}"
+
 
 if __name__ == "__main__":
 
